@@ -17,6 +17,8 @@ import type { HooksType } from '#db/repositories/hooks/types';
 
 type Options = {
   enableIpv6?: boolean;
+  /** omit the PrivateKey line (client key pair lives on the device) */
+  omitPrivateKey?: boolean;
 };
 
 // needed to support cli
@@ -92,11 +94,15 @@ PostDown = ${iptablesTemplate(hooks.postDown, wgInterface)}`;
     client: ClientType,
     options: Options = {}
   ) => {
-    const { enableIpv6 = true } = options;
+    const { enableIpv6 = true, omitPrivateKey = false } = options;
 
     const address =
       `${client.ipv4Address}/32` +
       (enableIpv6 ? `, ${client.ipv6Address}/128` : '');
+
+    const privateKeyLine = omitPrivateKey
+      ? null
+      : `PrivateKey = ${client.privateKey}`;
 
     const hookLines = [
       client.preUp ? `PreUp = ${removeNewlines(client.preUp)}` : null,
@@ -119,8 +125,7 @@ PostDown = ${iptablesTemplate(hooks.postDown, wgInterface)}`;
     );
 
     return `[Interface]
-PrivateKey = ${client.privateKey}
-Address = ${address}
+${privateKeyLine ? `${privateKeyLine}\n` : ''}Address = ${address}
 MTU = ${client.mtu}
 ${extraLines.length ? `${extraLines.join('\n')}\n` : ''}
 [Peer]

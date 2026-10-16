@@ -13,6 +13,13 @@ export const general = sqliteTable('general_table', {
   metricsJson: int('metrics_json', { mode: 'boolean' }).notNull(),
   metricsPassword: text('metrics_password'),
 
+  liveWireGuardEnabled: int('livewireguard_enabled', { mode: 'boolean' })
+    .notNull()
+    .default(false),
+  liveWireGuardAudience: text('livewireguard_audience')
+    .notNull()
+    .default('livewireguard'),
+
   createdAt: text('created_at')
     .notNull()
     .default(sql`(CURRENT_TIMESTAMP)`),

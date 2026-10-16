@@ -104,6 +104,7 @@
     "address": "Address",
     "serverAllowedIps": "Server Allowed IPs",
     "otlDesc": "Generate short one time link",
+    "liveWireGuardDevice": "Provisioned via LiveWireGuard (key pair lives on the device)",
     "permanent": "Permanent",
     "createdOn": "Created on {date}",
     "lastSeen": "Last seen on {date}",
@@ -168,7 +169,14 @@
       "json": "JSON",
       "jsonDesc": "Route for metrics in JSON format",
       "prometheus": "Prometheus",
-      "prometheusDesc": "Route for Prometheus metrics"
+      "prometheusDesc": "Route for Prometheus metrics",
+      "liveWireGuard": "LiveWireGuard",
+      "liveWireGuardEnabled": "Enabled",
+      "liveWireGuardEnabledDesc": "Allow LiveWireGuard clients to provision their config via OIDC (GET /api/livewireguard/config)",
+      "liveWireGuardAudience": "Audience",
+      "liveWireGuardAudienceDesc": "Expected audience (OIDC client id) of the LiveWireGuard app's tokens",
+      "liveWireGuardEndpoint": "Endpoint",
+      "liveWireGuardEndpointDesc": "Fill this URL into the LiveWireGuard app's import wizard"
     },
     "config": {
       "connection": "Connection",
@@ -241,7 +249,9 @@
     "general": {
       "sessionTimeout": "Session Timeout",
       "metricsEnabled": "Metrics",
-      "metricsPassword": "Metrics Password"
+      "metricsPassword": "Metrics Password",
+      "liveWireGuardEnabled": "LiveWireGuard",
+      "liveWireGuardAudience": "LiveWireGuard Audience"
     },
     "interface": {
       "cidr": "CIDR",

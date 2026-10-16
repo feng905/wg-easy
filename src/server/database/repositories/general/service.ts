@@ -39,6 +39,16 @@ function createPreparedStatement(db: DBType) {
           metricsPrometheus: true,
           metricsJson: true,
           metricsPassword: true,
+          liveWireGuardEnabled: true,
+          liveWireGuardAudience: true,
+        },
+      })
+      .prepare(),
+    getLiveWireGuardConfig: db.query.general
+      .findFirst({
+        columns: {
+          liveWireGuardEnabled: true,
+          liveWireGuardAudience: true,
         },
       })
       .prepare(),
@@ -130,5 +140,21 @@ export class GeneralService {
     }
 
     return result;
+  }
+
+  /**
+   * @throws
+   */
+  async getLiveWireGuardConfig() {
+    const result = await this.#statements.getLiveWireGuardConfig.execute();
+
+    if (!result) {
+      throw new Error('General Config not found');
+    }
+
+    return {
+      enabled: result.liveWireGuardEnabled,
+      audience: result.liveWireGuardAudience,
+    };
   }
 }

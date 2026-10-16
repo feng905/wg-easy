@@ -151,6 +151,26 @@ class WireGuard {
     });
   }
 
+  /**
+   * Client configuration without the PrivateKey line.
+   * Used for LiveWireGuard clients whose key pair lives on the device.
+   */
+  async getClientConfigurationKeyless({ clientId }: { clientId: ID }) {
+    const wgInterface = await Database.interfaces.get();
+    const userConfig = await Database.userConfigs.get();
+
+    const client = await Database.clients.get(clientId);
+
+    if (!client) {
+      throw new Error('Client not found');
+    }
+
+    return wg.generateClientConfig(wgInterface, userConfig, client, {
+      enableIpv6: !WG_ENV.DISABLE_IPV6,
+      omitPrivateKey: true,
+    });
+  }
+
   async getClientQRCodeSVG({ clientId }: { clientId: ID }) {
     const config = await this.getClientConfiguration({ clientId });
     return encodeQRCode(config);

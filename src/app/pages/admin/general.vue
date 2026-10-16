@@ -31,6 +31,27 @@
         />
       </FormGroup>
       <FormGroup>
+        <FormHeading>{{ $t('admin.general.liveWireGuard') }}</FormHeading>
+        <FormSwitchField
+          id="liveWireGuard"
+          v-model="data.liveWireGuardEnabled"
+          :label="$t('admin.general.liveWireGuardEnabled')"
+          :description="$t('admin.general.liveWireGuardEnabledDesc')"
+        />
+        <FormTextField
+          id="liveWireGuardAudience"
+          v-model="data.liveWireGuardAudience"
+          :label="$t('admin.general.liveWireGuardAudience')"
+          :description="$t('admin.general.liveWireGuardAudienceDesc')"
+        />
+        <FormInfoField
+          id="liveWireGuardEndpoint"
+          :data="liveWireGuardEndpoint"
+          :label="$t('admin.general.liveWireGuardEndpoint')"
+          :description="$t('admin.general.liveWireGuardEndpointDesc')"
+        />
+      </FormGroup>
+      <FormGroup>
         <FormHeading>{{ $t('form.actions') }}</FormHeading>
         <FormPrimaryActionField type="submit" :label="$t('form.save')" />
         <FormSecondaryActionField :label="$t('form.revert')" @click="revert" />
@@ -44,6 +65,12 @@ const { data: _data, refresh } = await useFetch(`/api/admin/general`, {
   method: 'get',
 });
 const data = toRef(_data.value);
+
+// Provisioning URL handed to the LiveWireGuard app; only meaningful in the browser
+const liveWireGuardEndpoint = ref('');
+onMounted(() => {
+  liveWireGuardEndpoint.value = `${window.location.origin}/api/livewireguard/config`;
+});
 
 const _submit = useSubmit(
   (data) =>

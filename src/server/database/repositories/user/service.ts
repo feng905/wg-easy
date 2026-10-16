@@ -107,6 +107,36 @@ export class UserService {
     return this.#statements.findById.execute({ id });
   }
 
+  /**
+   * Find a user by its OIDC identity without side effects.
+   * Matches by (provider='oidc', oauthId) first, then by email if verified.
+   */
+  async findOidcUser(
+    oauthId: string,
+    email?: string,
+    emailVerified?: boolean
+  ): Promise<UserType | undefined> {
+    const userById = await this.#db.query.user
+      .findFirst({
+        where: and(eq(user.oauthProvider, 'oidc'), eq(user.oauthId, oauthId)),
+      })
+      .execute();
+
+    if (userById) {
+      return userById;
+    }
+
+    if (!email || !emailVerified) {
+      return undefined;
+    }
+
+    return (
+      (await this.#db.query.user
+        .findFirst({ where: eq(user.email, email) })
+        .execute()) ?? undefined
+    );
+  }
+
   async getByUsername(username: string) {
     return this.#statements.findByUsername.execute({ username });
   }

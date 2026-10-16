@@ -17,6 +17,18 @@ import { wg } from '#server/utils/wgHelper';
 import type { DBType } from '#db/sqlite';
 import { wgInterface, userConfig } from '#db/schema';
 
+export class MaxClientsReachedError extends Error {
+  constructor(cause: unknown) {
+    super('Maximum number of clients reached', { cause });
+  }
+}
+
+export class PublicKeyConflictError extends Error {
+  constructor() {
+    super('Public key already in use');
+  }
+}
+
 function createPreparedStatement(db: DBType) {
   return {
     findAll: db.query.client
@@ -37,6 +49,27 @@ function createPreparedStatement(db: DBType) {
           preSharedKey: false,
         },
       })
+      .prepare(),
+    findByDevice: db.query.client
+      .findFirst({
+        where: and(
+          eq(client.userId, sql.placeholder('userId') as never as number),
+          eq(client.deviceId, sql.placeholder('deviceId') as never as string)
+        ),
+      })
+      .prepare(),
+    findByPublicKeyForUser: db.query.client
+      .findFirst({
+        where: and(
+          eq(client.userId, sql.placeholder('userId') as never as number),
+          eq(client.publicKey, sql.placeholder('publicKey') as never as string)
+        ),
+      })
+      .prepare(),
+    updateDeviceId: db
+      .update(client)
+      .set({ deviceId: sql.placeholder('deviceId') as never as string })
+      .where(eq(client.id, sql.placeholder('id')))
       .prepare(),
     toggle: db
       .update(client)
@@ -242,6 +275,150 @@ export class ClientService {
 
   delete(id: ID) {
     return this.#statements.delete.execute({ id });
+  }
+
+  /**
+   * Find a client by its LiveWireGuard device id
+   */
+  async getByDevice(userId: ID, deviceId: string) {
+    return await this.#statements.findByDevice.execute({
+      userId,
+      deviceId,
+    });
+  }
+
+  /**
+   * Find a client of a user by its public key
+   */
+  async getByPublicKeyForUser(userId: ID, publicKey: string) {
+    return await this.#statements.findByPublicKeyForUser.execute({
+      userId,
+      publicKey,
+    });
+  }
+
+  setDeviceId(id: ID, deviceId: string) {
+    return this.#statements.updateDeviceId.execute({ id, deviceId });
+  }
+
+  /**
+   * Create a client for a LiveWireGuard device.
+   * The private key stays on the device, only its public key is stored.
+   */
+  async createForDevice(input: {
+    userId: ID;
+    deviceId: string;
+    publicKey: string;
+    name: string;
+  }): Promise<{ clientId: ID }> {
+    const preSharedKey = await wg.generatePreSharedKey();
+
+    return this.#db.transaction(async (tx) => {
+      const clients = await tx.query.client.findMany().execute();
+      const clientInterface = await tx.query.wgInterface
+        .findFirst({
+          where: eq(wgInterface.name, WG_ENV.WG_INTERFACE),
+        })
+        .execute();
+
+      if (!clientInterface) {
+        throw new Error('WireGuard interface not found');
+      }
+
+      const clientConfig = await tx.query.userConfig
+        .findFirst({
+          where: eq(userConfig.id, clientInterface.name),
+        })
+        .execute();
+
+      if (!clientConfig) {
+        throw new Error('WireGuard interface configuration not found');
+      }
+
+      let ipv4Address: string;
+      let ipv6Address: string;
+      try {
+        const ipv4Cidr = parseCidr(clientInterface.ipv4Cidr);
+        ipv4Address = nextIP(4, ipv4Cidr, clients);
+        const ipv6Cidr = parseCidr(clientInterface.ipv6Cidr);
+        ipv6Address = nextIP(6, ipv6Cidr, clients);
+      } catch (err) {
+        throw new MaxClientsReachedError(err);
+      }
+
+      const result = await tx
+        .insert(client)
+        .values({
+          name: input.name,
+          userId: input.userId,
+          interfaceId: WG_ENV.WG_INTERFACE,
+          deviceId: input.deviceId,
+          // the private key never leaves the device
+          privateKey: '',
+          publicKey: input.publicKey,
+          preSharedKey,
+          ipv4Address,
+          ipv6Address,
+          mtu: clientConfig.defaultMtu,
+          jC: clientConfig.defaultJC,
+          jMin: clientConfig.defaultJMin,
+          jMax: clientConfig.defaultJMax,
+          i1: clientConfig.defaultI1,
+          i2: clientConfig.defaultI2,
+          i3: clientConfig.defaultI3,
+          i4: clientConfig.defaultI4,
+          i5: clientConfig.defaultI5,
+          persistentKeepalive: clientConfig.defaultPersistentKeepalive,
+          serverAllowedIps: [],
+          enabled: true,
+        })
+        .returning({ clientId: client.id })
+        .execute();
+
+      const clientId = result[0]?.clientId;
+
+      if (clientId === undefined) {
+        throw new Error('Failed to create client');
+      }
+
+      return { clientId };
+    });
+  }
+
+  /**
+   * Rotate the public key of a client (device regenerated its key pair)
+   */
+  async rotatePublicKey(id: ID, publicKey: string): Promise<'ok' | 'conflict'> {
+    return this.#db.transaction(async (tx) => {
+      const txClient = await tx.query.client
+        .findFirst({ where: eq(client.id, id) })
+        .execute();
+
+      if (!txClient) {
+        throw new Error('Client not found');
+      }
+
+      const conflict = await tx.query.client
+        .findFirst({
+          where: and(
+            eq(client.publicKey, publicKey),
+            eq(client.interfaceId, txClient.interfaceId)
+          ),
+        })
+        .execute();
+
+      if (conflict && conflict.id !== id) {
+        return 'conflict';
+      }
+
+      await tx
+        .update(client)
+        .set({ publicKey })
+        .where(eq(client.id, id))
+        .execute();
+
+      return 'ok';
+    });
   }
 
   update(id: ID, data: UpdateClientType) {

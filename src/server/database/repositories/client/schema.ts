@@ -63,6 +63,8 @@ export const client = sqliteTable(
     disableCookies: int('disable_cookies', { mode: 'boolean' }),
     dns: text({ mode: 'json' }).$type<string[]>(),
     serverEndpoint: text('server_endpoint'),
+    /** LiveWireGuard device id (X-Device-Id); null = created from panel/migration */
+    deviceId: text('device_id'),
     enabled: int({ mode: 'boolean' }).notNull(),
     createdAt: text('created_at')
       .notNull()

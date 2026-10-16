@@ -17,11 +17,22 @@ const metricsPassword = z
   .pipe(safeStringRefine)
   .nullable();
 
+const liveWireGuardEnabled = z.boolean({
+  message: t('zod.general.liveWireGuardEnabled'),
+});
+
+const liveWireGuardAudience = z
+  .string({ message: t('zod.general.liveWireGuardAudience') })
+  .min(1, { message: t('zod.general.liveWireGuardAudience') })
+  .pipe(safeStringRefine);
+
 export const GeneralUpdateSchema = z.object({
   sessionTimeout: sessionTimeout,
   metricsPrometheus: metricsEnabled,
   metricsJson: metricsEnabled,
   metricsPassword: metricsPassword,
+  liveWireGuardEnabled: liveWireGuardEnabled,
+  liveWireGuardAudience: liveWireGuardAudience,
 });
 
 export type GeneralUpdateType = z.infer<typeof GeneralUpdateSchema>;
